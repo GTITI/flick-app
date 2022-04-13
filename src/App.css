@@ -28,11 +28,49 @@
   color: #61dafb;
 }
 
+.input {
+  height: 30px;
+  width: 300px;
+  font-size: 20px;
+  font-family: ui-monospace;
+  margin: 30px 0;
+  border: 2px solid #929292;
+  padding: 0 10px;
+  border-radius: 20px;
+}
+
+.infinite-scroll-component {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  padding: 50px;
+}
+.image:hover {
+  transform: scale(1.5);
+  filter: unset;
+  z-index: 2;
+}
+.image {
+  filter: blur(2px);
+  flex-basis: 33%;
+  align-self: center;
+  justify-self: center;
+}
+
 @keyframes App-logo-spin {
   from {
     transform: rotate(0deg);
   }
   to {
     transform: rotate(360deg);
+  }
+}
+
+@media only screen and (max-width: 1024px) {
+  .infinite-scroll-component {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .image {
+    filter: blur(2px);
+    flex-basis: 50%;
   }
 }

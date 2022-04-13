@@ -1,82 +1,100 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
+import debounce from "lodash.debounce";
+import InfiniteScroll from "react-infinite-scroll-component";
 
 import "./App.css";
+
+function getURL(currentPage, encodedQuery) {
+  return `https://api.flickr.com/services/rest/?method=flickr.photos.search&safe_search=1&format=json&nojsoncallback=1&api_key=15b67c2a8b4288ff1fddf5eb56655cfb&content_type=1&is_getty=1&page=${currentPage}&tags=${encodedQuery}`;
+}
+function getPhotoURL(photo) {
+  return `https://live.staticflickr.com/${photo.server}/${photo.id}_${photo.secret}.jpg`;
+}
 
 function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [photos, setPhotos] = useState([]);
   const [hasNextPage, setHasNextPage] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
 
+  const fetchData = (page) => {
+    const encodedQuery = encodeURIComponent(searchQuery);
+    axios({
+      url: getURL(page, encodedQuery),
+      method: "GET",
+    }).then(
+      (res) => {
+        if (res.status < 400) {
+          if (res.data.photos.page !== 1) {
+            setPhotos([...photos, ...res.data.photos.photo]);
+          } else {
+            setPhotos(res.data.photos.photo);
+          }
+          setHasNextPage(res.data.photos.page < res.data.photos.pages);
+          setCurrentPage(res.data.photos.page + 1);
+        }
+        if (res.status === 500) {
+          return Promise.reject({
+            status: 500,
+            data: "Something went wrong.",
+          });
+        }
+      },
+      (error) => {
+        return Promise.reject({
+          status: error?.response?.status,
+          data: error.message,
+        });
+      }
+    );
+  };
   useEffect(() => {
     if (searchQuery) {
-      const encodedQuery = encodeURIComponent(searchQuery);
-      setTimeout(() => {
-        axios({
-          url: `https://api.flickr.com/services/rest/?method=flickr.photos.search&safe_search=1&format=json&nojsoncallback=1&api_key=15b67c2a8b4288ff1fddf5eb56655cfb&content_type=1&is_getty=1&tags=${encodedQuery}`,
-          method: "GET",
-        }).then(
-          (res) => {
-            if (res.status < 400) {
-              // const returnedPhotos = Promise.resolve(res.data);
-              setHasNextPage(res.data.page < res.data.pages);
-              setPhotos(res.data.photos.photo);
-            }
-            if (res.status === 500) {
-              return Promise.reject({
-                status: 500,
-                data: "Something went wrong.",
-              });
-            }
-            // throw Promise.reject({ status: res.status, data: res.data });
-          },
-          (error) => {
-            return Promise.reject({
-              status: error?.response?.status,
-              data: error.message,
-            });
-          }
-        );
-      }, 2000);
+      setHasNextPage(true);
+      fetchData(1);
+      setPhotos([]);
     }
   }, [searchQuery]);
-  console.log(photos);
+
+  const changeHandler = (event) => {
+    setSearchQuery(event.target.value);
+  };
+
+  const debouncedChangeHandler = useCallback(debounce(changeHandler, 1000), []);
   return (
     <div className="App">
-      <form
-        onSubmit={() => {
-          console.log("submited");
-        }}
-      >
-        <label>
-          Name:
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(event) => {
-              setSearchQuery(event.target.value);
-            }}
-          />
-        </label>
-        <input type="submit" value="Submit" />
-      </form>
-      <div>
-        {photos &&
-          searchQuery &&
-          photos.map((photo, key) => {
-            const srcPath =
-              "https://farm" +
-              photo.farm +
-              ".staticflickr.com/" +
-              photo.server +
-              "/" +
-              photo.id +
-              "_" +
-              photo.secret +
-              ".jpg";
-            return <img src={srcPath} alt={photo.title} key={key} />;
+      <input
+        className="input"
+        onChange={debouncedChangeHandler}
+        type="text"
+        placeholder="Type a query..."
+      />
+      {photos && searchQuery && (
+        <InfiniteScroll
+          dataLength={photos.length}
+          next={() => fetchData(currentPage)}
+          hasMore={hasNextPage}
+          loader={photos.length ? <h4>Loading...</h4> : null}
+          endMessage={
+            <p style={{ textAlign: "center" }}>
+              <b>Yay! You have seen it all</b>
+            </p>
+          }
+        >
+          {photos.map((photo, key) => {
+            const srcPath = getPhotoURL(photo);
+            return (
+              <img
+                className="image"
+                src={srcPath}
+                alt={photo.title}
+                key={key}
+              />
+            );
           })}
-      </div>
+        </InfiniteScroll>
+      )}
     </div>
   );
 }
